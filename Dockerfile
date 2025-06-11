@@ -7,7 +7,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 WORKDIR /app
 
 # Copy project configuration
-COPY pyproject.toml .
+COPY pyproject.toml uv.lock ./
 
 # Create virtual environment and sync dependencies
 RUN uv sync --frozen
