@@ -18,13 +18,19 @@ WORKDIR /app
 # Copy project configuration with proper ownership
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 
+# Switch to non-root user before installing dependencies
+USER appuser
+
 # Create virtual environment and sync dependencies
 RUN uv sync --frozen
+
+# Switch back to root to copy application code
+USER root
 
 # Copy application code with proper ownership
 COPY --chown=appuser:appuser . .
 
-# Switch to non-root user
+# Switch to non-root user for runtime
 USER appuser
 
 # Expose port
