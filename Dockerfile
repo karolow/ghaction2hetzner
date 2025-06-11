@@ -11,7 +11,7 @@ COPY requirements.txt .
 
 # Create virtual environment and install dependencies with uv
 RUN uv venv /opt/venv && \
-    uv pip install --no-cache -r requirements.txt
+    uv pip install --no-cache --python /opt/venv/bin/python -r requirements.txt
 
 # Copy application code
 COPY . .
