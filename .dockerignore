@@ -26,4 +26,3 @@ README.md
 .gitignore
 Dockerfile
 docker-compose.yml
-uv.lock
