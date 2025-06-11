@@ -6,6 +6,9 @@ __pycache__
 *.pyd
 .Python
 env
+.env
+.venv
+venv/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox
@@ -23,3 +26,4 @@ README.md
 .gitignore
 Dockerfile
 docker-compose.yml
+uv.lock
