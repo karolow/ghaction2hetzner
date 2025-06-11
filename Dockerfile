@@ -15,6 +15,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 # Set working directory
 WORKDIR /app
 
+# Change ownership of /app to appuser
+RUN chown -R appuser:appuser /app
+
 # Copy project configuration with proper ownership
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 
