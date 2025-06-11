@@ -7,54 +7,73 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Build Docker image
+
+    - name: Create source code archive
       run: |
-        docker build -t fastapi-test-app .
-        docker save fastapi-test-app > fastapi-test-app.tar
-    
-    - name: Copy Docker image to VPS
-      uses: appleboy/scp-action@v0.1.4
+        # Only include files needed for Docker build
+        tar -czvf source.tar.gz \
+          main.py \
+          pyproject.toml \
+          uv.lock \
+          Dockerfile \
+          .dockerignore
+
+    - name: Copy source code to VPS
+      uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
-        source: "fastapi-test-app.tar"
-        target: "/tmp/"
-    
+        source: "source.tar.gz"
+        target: "/home/${{ secrets.VPS_USER }}/app/"
+        overwrite: true
+
     - name: Deploy on VPS
-      uses: appleboy/ssh-action@v1.0.0
+      uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         script: |
-          # Load the Docker image
-          docker load < /tmp/fastapi-test-app.tar
-          
-          # Stop and remove existing container if running
+          set -e  # Exit on any error
+
+          # Navigate to app directory
+          cd /home/${{ secrets.VPS_USER }}/app
+
+          # Extract source code
+          tar -xzf source.tar.gz
+
+          # Build Docker image on VPS (leverages Docker build cache)
+          docker build -t fastapi-test-app:latest .
+
+          # Stop and remove existing container gracefully
           docker stop fastapi-test-app || true
           docker rm fastapi-test-app || true
-          
-          # Remove old image to save space
-          docker image prune -f
-          
-          # Run new container with environment variables
+
+          # Run new container with secure environment file
           docker run -d \
             --name fastapi-test-app \
             -p 80:8000 \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            -e API_SECRET_KEY="${{ secrets.API_SECRET_KEY }}" \
-            -e DEBUG_MODE="${{ secrets.DEBUG_MODE }}" \
+            --env-file .env \
             --restart unless-stopped \
-            fastapi-test-app
-          
-          # Clean up the tar file
-          rm /tmp/fastapi-test-app.tar
-          
-          # Show container status
-          docker ps | grep fastapi-test-app
+            --health-cmd="curl -f http://localhost:8000/health || exit 1" \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            fastapi-test-app:latest
+
+          # Clean up
+          rm -f source.tar.gz
+          docker image prune -f --filter "dangling=true"
+
+          # Verify deployment
+          echo "Deployment completed. Container status:"
+          docker ps --filter "name=fastapi-test-app" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+          # Wait a moment and check health
+          sleep 10
+          docker exec fastapi-test-app curl -f http://localhost:8000/health || echo "Health check failed"
